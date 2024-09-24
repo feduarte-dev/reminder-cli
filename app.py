@@ -42,8 +42,12 @@ def lambda_save_db(event):
             gap = data.get("gap")  # In how many hours you want to be reminded
             frequency = data.get("frequency", 1)  # Number of reminders
 
-            # Calcular duration
-            duration = datetime.now() + timedelta(hours=frequency * gap)
+            # Verifica se 'duration' foi passado, caso contrário calcula
+            if "duration" in data:
+                duration = datetime.strptime(data["duration"], "%Y-%m-%d %H:%M:%S")
+            else:
+                # Calcular 'duration' caso não seja fornecido
+                duration = datetime.now() + timedelta(hours=frequency * gap)
 
             # Criação da query SQL
             sql = """
@@ -100,6 +104,8 @@ def lambda_send_queue():
 
                 # Caso esteja na hora de enviar a notificação
                 if now <= next_reminder_time <= now + timedelta(minutes=10):
+                    print(f"now: {now}, next_reminder_time: {next_reminder_time}")
+
                     print(f"Está na hora de: {message}")
 
                     # Envia a primeira notificação
@@ -180,15 +186,44 @@ def lambda_send_queue():
         connection.close()
 
 
+# # Função CLI usando Click
+# @click.command()
+# @click.argument("json_data")
+# def cli(json_data):
+#     """CLI para inserir dados no banco de dados MySQL a partir de uma string JSON"""
+
+#     # Convertendo o argumento string para dicionário
+#     try:
+#         # Para que a string seja lida como JSON, precisamos substituir aspas simples por aspas duplas
+#         json_data = json_data.replace("'", '"')
+#         data = json.loads(json_data)
+#     except json.JSONDecodeError as e:
+#         click.echo(f"Erro ao converter JSON: {e}")
+#         return
+
+#     # Construindo o evento como se fosse passado para o Lambda
+#     event = {"body": json.dumps(data)}
+
+#     # Chama a função lambda_save_db
+#     result = lambda_save_db(event)
+
+#     # Mostra o resultado
+#     click.echo(f"Resultado: {result['body']}")
+
+
 # Função CLI usando Click
+@click.group()
+def cli():
+    """CLI para gerenciar lembretes."""
+
+
 @click.command()
 @click.argument("json_data")
-def cli(json_data):
-    """CLI para inserir dados no banco de dados MySQL a partir de uma string JSON"""
+def add(json_data):
+    """Adicionar um lembrete ao banco de dados MySQL a partir de uma string JSON"""
 
     # Convertendo o argumento string para dicionário
     try:
-        # Para que a string seja lida como JSON, precisamos substituir aspas simples por aspas duplas
         json_data = json_data.replace("'", '"')
         data = json.loads(json_data)
     except json.JSONDecodeError as e:
@@ -203,6 +238,19 @@ def cli(json_data):
 
     # Mostra o resultado
     click.echo(f"Resultado: {result['body']}")
+
+
+@click.command()
+def send_reminders():
+    """Verificar lembretes e enviar notificações pela fila SQS."""
+
+    lambda_send_queue()
+    click.echo("Verificação de lembretes concluída.")
+
+
+# Adicionando os comandos ao grupo CLI
+cli.add_command(add)
+cli.add_command(send_reminders)
 
 
 if __name__ == "__main__":

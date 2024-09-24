@@ -1,7 +1,7 @@
 import os
 import pymysql
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+
 
 # Carregar variáveis do .env
 load_dotenv()

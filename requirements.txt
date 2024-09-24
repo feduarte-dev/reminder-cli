@@ -2,3 +2,4 @@ pymysql
 dotenv
 boto3
 click
+sqlalchemy
