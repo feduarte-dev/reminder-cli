@@ -6,8 +6,6 @@ import click
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
-# Inicializando o cliente SQS
-sqs_client = boto3.client("sqs")
 
 # Inicializando o cliente Lambda
 lambda_client = boto3.client("lambda")
