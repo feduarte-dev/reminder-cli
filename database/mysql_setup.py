@@ -1,6 +1,7 @@
 import os
 import pymysql
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 # Carregar variáveis do .env
 load_dotenv()
@@ -27,37 +28,57 @@ try:
         # Usar o banco de dados criado
         cursor.execute(f"USE {db_name};")
 
-        # Criar a tabela `users` (se não existir) com valores padrão para frequency e gap
+        # Criar a tabela `users`
         cursor.execute(
             """
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            phone_number VARCHAR(20),
-            message VARCHAR(50),
-            frequency INT DEFAULT 1,
-            gap INT DEFAULT 0
+            phone_number VARCHAR(20) UNIQUE NOT NULL
         );
         """
         )
         print("Tabela 'users' criada (ou já existe).")
 
-        # Inserir dados na tabela
+        # Criar a tabela `reminders`
         cursor.execute(
             """
-        INSERT INTO users (phone_number, message, frequency, gap)
+        CREATE TABLE IF NOT EXISTS reminders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            userId INT,
+            message VARCHAR(50),
+            frequency INT DEFAULT 1,
+            gap INT DEFAULT 0,
+            startAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+            duration DATETIME,
+            done BOOLEAN DEFAULT FALSE,
+            FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+        );
+        """
+        )
+        print("Tabela 'reminders' criada (ou já existe).")
+
+        # Inserir dados na tabela `users`
+        cursor.execute(
+            """
+        INSERT INTO users (phone_number)
         VALUES
-        ('+5511987654322', 'lembre me de tomar remedio', 5, 8);
+        ('+5511987654322'),
+        ('+5511987654321');
         """
         )
         print("Dados inseridos na tabela 'users'.")
+
+        # Inserir dados na tabela `reminders`, calculando o valor de `duration`
         cursor.execute(
             """
-        INSERT INTO users (phone_number, message)
+        INSERT INTO reminders (userId, message, frequency, gap, duration)
         VALUES
-        ('+5511987654321', 'lembre me de levantar!');
+        (1, 'lembre me de tomar remedio', 3, 6, DATE_ADD(NOW(), INTERVAL (3 * 6) HOUR)),
+        (1, 'lembre me de tomar remedio', 3, 6, DATE_ADD(NOW(), INTERVAL (3 * 6) HOUR)),
+        (2, 'lembre me de levantar!', 1, 12, DATE_ADD(NOW(), INTERVAL (1 * 12) HOUR));
         """
         )
-        print("Dados inseridos na tabela 'users'.")
+        print("Dados inseridos na tabela 'reminders'.")
 
         # Confirmar mudanças
         connection.commit()
