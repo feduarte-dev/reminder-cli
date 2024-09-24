@@ -47,7 +47,7 @@ try:
             userId INT,
             message VARCHAR(50),
             frequency INT DEFAULT 1,
-            gap INT DEFAULT 0,
+            gap INT,
             startAt DATETIME DEFAULT CURRENT_TIMESTAMP,
             duration DATETIME,
             done BOOLEAN DEFAULT FALSE,

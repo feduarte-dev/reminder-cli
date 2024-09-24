@@ -4,10 +4,10 @@ import pymysql
 import boto3
 import click
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 # Inicializando o cliente SQS
 client = boto3.client("sqs")
-
 
 # Carregar variáveis do .env
 load_dotenv()
@@ -19,7 +19,6 @@ db_name = os.getenv("DB_NAME")
 port = int(os.getenv("DB_PORT"))
 
 
-# Na documentação existe mais um parametro chamado 'context', devo adicioná-lo aqui?
 def lambda_save_db(event):
     # Parâmetros recebidos no evento
     data = json.loads(event["body"])
@@ -33,15 +32,20 @@ def lambda_save_db(event):
         with connection.cursor() as cursor:
             phone_number = data["phone_number"]
             message = data["message"]
-            # Usar valores padrão se não forem fornecidos
-            frequency = data.get("frequency", 1)  # Valor padrão de 1
-            gap = data.get("gap", 0)  # Valor padrão de 0
+            gap = data.get("gap")  # In how many hours you want to be remminded
+            frequency = data.get("frequency", 1)  # Number of remminders
+
+            # Calcular duration
+            duration = datetime.now() + timedelta(hours=frequency * gap)
 
             # Criação da query SQL
-            sql = "INSERT INTO users (phone_number, message, frequency, gap) VALUES (%s, %s, %s, %s)"
+            sql = """
+            INSERT INTO reminders (userId, message, frequency, gap, duration)
+            VALUES ((SELECT id FROM users WHERE phone_number = %s), %s, %s, %s, %s)
+            """
 
             # Executa a query
-            cursor.execute(sql, (phone_number, message, frequency, gap))
+            cursor.execute(sql, (phone_number, message, frequency, gap, duration))
 
             # Commit para salvar as mudanças no banco
             connection.commit()
