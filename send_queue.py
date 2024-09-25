@@ -27,19 +27,32 @@ session = Session()
 
 # Função para verificar lembretes e enviar notificações
 def lambda_send_queue():
-    try:
-        reminders = session.query(Reminder).filter_by(done=False).all()
-        now = datetime.now()
+    # Iniciar a sessão do SQLAlchemy
 
+    try:
+        # Recuperar todos os lembretes não concluídos
+        reminders = session.query(Reminder).filter_by(done=False).all()
+
+        now = datetime.now()
+        print(f"Current time: {now}")
+
+        # Verificar se o lembrete está dentro da janela de 10 minutos
         for reminder in reminders:
+            # Calcula o próximo horário do lembrete
             next_reminder_time = reminder.startAt
             while next_reminder_time <= now:
                 next_reminder_time += timedelta(hours=reminder.gap)
 
-            if now <= next_reminder_time <= now + timedelta(minutes=10):
-                print(f"Está na hora de: {reminder.message}")
+            # Calcular quanto tempo falta para o próximo lembrete
+            time_until_reminder = (
+                next_reminder_time - now
+            ).total_seconds() / 60.0  # em minutos
 
-                # Enviar a primeira notificação
+            # Envia a notificação se faltar menos de 10 minutos
+            if 0 <= time_until_reminder <= 10:
+                print(f"Está na hora de: {reminder.message}, em {next_reminder_time}")
+
+                # Envia a primeira notificação
                 first_message = {
                     "userId": reminder.userId,
                     "message": reminder.message,
@@ -60,7 +73,7 @@ def lambda_send_queue():
                         f"Erro ao enviar a primeira notificação para a fila SQS: {response}"
                     )
 
-                # Enviar segunda notificação após 15 minutos
+                # Envia segunda notificação após 15 minutos
                 second_message = {
                     "userId": reminder.userId,
                     "message": "Já tomou seu remédio?",
@@ -73,29 +86,34 @@ def lambda_send_queue():
                     DelaySeconds=900,  # 15 minutos de delay (900 segundos)
                 )
 
-                # Se deu tudo certo, atualiza o banco de dados
                 if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
                     print(
                         f"Notificação 'Já tomou seu remédio?' agendada com sucesso: {second_message}"
                     )
 
-                    # Diminui o valor de frequency para os próximos cálculos quando a função rodar novamente
-                    if reminder.frequency > 1:
+                    # Atualiza a frequência no banco de dados
+                    if reminder.frequency >= 1:
                         reminder.frequency -= 1
+                        session.commit()  # Faz o commit da mudança
+                        print(
+                            f"Frequency decrementado para {reminder.frequency} para o reminder_id {reminder.id}"
+                        )
                     else:
+                        # Quando frequency for 0, muda o status para done
                         reminder.done = True
-
-                    session.commit()
+                        session.commit()  # Faz o commit da mudança
+                        print(f"Reminder {reminder.id} marcado como 'done'.")
                 else:
                     print(f"Erro ao agendar a segunda notificação: {response}")
-
             else:
-                print(f"Ainda não está na hora de: {reminder.message}")
+                # Caso ainda não esteja na hora
+                print(
+                    f"Ainda não está na hora de: {reminder.message}, faltam {time_until_reminder} minutos"
+                )
 
     except Exception as e:
-        session.rollback()
         print(f"Erro ao verificar lembretes: {str(e)}")
 
-    # Fechar a sessão ao final
     finally:
+        # Fechar a sessão do SQLAlchemy
         session.close()
