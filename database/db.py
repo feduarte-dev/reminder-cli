@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Index
 from sqlalchemy.orm import declarative_base
 
 # Configurando SQLAlchemy
@@ -17,6 +17,9 @@ class Reminder(Base):
     gap = Column(Float, nullable=False)
     frequency = Column(Integer, nullable=False)
     done = Column(Boolean, default=False)
+
+    # Adicionando índice ao campo 'startAt'
+    __table_args__ = (Index("idx_startAt", "startAt"),)  # Definição do índice
 
 
 # Definindo o modelo User
