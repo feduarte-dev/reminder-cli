@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from database.db import User, Reminder
+from datetime import datetime, timedelta
 
 
 # Carregar variáveis do .env
@@ -26,29 +27,48 @@ def lambda_save_db(event):
     # Parâmetros recebidos no evento
     data = json.loads(event["body"])
 
+    # Iniciar a sessão do SQLAlchemy
+    session = Session()
+
     try:
+        # Recupera os parâmetros da requisição
         phone_number = data["phone_number"]
         message = data["message"]
-        gap = data.get("gap")
-        frequency = data.get("frequency", 1)
+        gap = data.get("gap")  # Em quantas horas o lembrete deve ser enviado
+        frequency = data.get("frequency", 1)  # Número de lembretes
 
-        # Consulta para obter o userId baseado no número de telefone
+        # Verifica se 'duration' foi passado, caso contrário calcula
+        if "duration" in data:
+            duration = datetime.strptime(data["duration"], "%Y-%m-%d %H:%M:%S")
+        else:
+            # Calcular 'duration' caso não seja fornecido
+            duration = datetime.now() + timedelta(hours=frequency * gap)
+
+        # Consulta o usuário pelo número de telefone
         user = session.query(User).filter_by(phone_number=phone_number).first()
 
-        if user:
-            # Criar um novo lembrete
-            new_reminder = Reminder(
-                userId=user.id,
-                message=message,
-                gap=gap,
-                frequency=frequency,
-            )
+        if not user:
+            return {
+                "statusCode": 404,
+                "body": json.dumps("Usuário não encontrado."),
+            }
 
-            session.add(new_reminder)
-            session.commit()
+        # Cria um novo lembrete
+        reminder = Reminder(
+            userId=user.id,
+            message=message,
+            gap=gap,
+            frequency=frequency,
+            startAt=datetime.now(),  # Supondo que o startAt é agora
+            duration=duration,
+            done=False,  # Por padrão, o lembrete ainda não foi concluído
+        )
 
-        else:
-            return {"statusCode": 404, "body": json.dumps("Usuário não encontrado.")}
+        # Adiciona e salva o lembrete no banco de dados
+        session.add(reminder)
+        session.commit()
+
+        return {"statusCode": 200, "body": json.dumps("Dados inseridos com sucesso!")}
 
     except Exception as e:
         session.rollback()
@@ -57,4 +77,6 @@ def lambda_save_db(event):
             "body": json.dumps(f"Erro ao inserir dados: {str(e)}"),
         }
 
-    return {"statusCode": 200, "body": json.dumps("Dados inseridos com sucesso!")}
+    finally:
+        # Fechar a sessão do SQLAlchemy
+        session.close()
