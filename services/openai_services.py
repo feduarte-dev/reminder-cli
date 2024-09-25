@@ -70,8 +70,3 @@ def run_thread(client, thread_id, assistant_id):
         assistant_id=assistant_id,
         instructions=get_instructions(),
     )
-
-
-def get_last_message(client, thread_id):
-    messages = client.beta.threads.messages.list(thread_id=thread_id)
-    return messages.data[0].content[0].text.value

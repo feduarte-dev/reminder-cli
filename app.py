@@ -8,6 +8,7 @@ from services.openai_services import (
     create_openai_client,
 )
 from reminder_tool import get_reminder_tool
+import json
 
 
 def add_tool_to_assistant(client, assistant_id):
@@ -52,28 +53,26 @@ def send_message_to_assistant(client, assistant_id, thread, reminder_message):
         print(run.status)
 
 
-def process_reminder(data, phone_number):
-    # Process the 'gap' field to convert it to an integer
-    if "gap" in data:
-        # Verifique se o valor de 'gap' é uma string antes de chamar .replace()
-        if isinstance(data["gap"], str):
-            try:
-                # Remove the word "hours" or "hour" and convert the remaining string to an integer
-                gap_value = data["gap"].replace("hours", "").replace("hour", "").strip()
-                data["gap"] = int(gap_value)
-            except ValueError:
-                raise ValueError(
-                    f"Invalid format for gap: {data['gap']}. Expected format is 'X hours'."
-                )
-        else:
-            raise TypeError(
-                f"Expected 'gap' to be a string, but got {type(data['gap'])}."
+def process_reminder(api_response, phone_number):
+    # Processa o campo 'gap' para converter em um inteiro
+    if "gap" in api_response:
+
+        try:
+            # Remove a palavra "hours" ou "hour" e converte para inteiro
+            gap_value = (
+                api_response["gap"].replace("hours", "").replace("hour", "").strip()
+            )
+            api_response["gap"] = int(gap_value)
+        except ValueError:
+            raise ValueError(
+                f"Formato inválido para gap: {api_response['gap']}. Esperado: 'X hours'."
             )
 
-    # Add the phone_number field
-    data["phone_number"] = phone_number
+    # Adiciona o campo 'phone_number'
+    api_response["phone_number"] = phone_number
 
-    return data
+    # Retorna o JSON formatado de acordo com a necessidade
+    return api_response
 
 
 # Add args in production
@@ -100,17 +99,18 @@ def agent():
         client=client, id="1", phone_number="+559842358562", user_name="Teste Teste"
     )
 
-    # Change in production
+    # Change in production // sometimes duration doesnt come, need to check
     reminder_message = "Remind me to take a break every 2 hours for the next 8 hours."
     api_response = send_message_to_assistant(
         client, ASSISTANT_ID, thread, reminder_message
     )
 
-    # formated_response = process_reminder(api_response, phone_number="+559842358562")
+    obj = json.loads(api_response)
+    formated_response = process_reminder(obj, phone_number="+559842358562")
 
-    # result = lambda_save_db(api_response)
-
-    print(api_response)
+    result = lambda_save_db(formated_response)
+    print(result)
+    # print(formated_response)
 
     return api_response
 
