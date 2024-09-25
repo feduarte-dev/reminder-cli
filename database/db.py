@@ -16,6 +16,7 @@ class Reminder(Base):
     startAt = Column(DateTime, default=datetime.now)
     gap = Column(Float, nullable=False)
     frequency = Column(Integer, nullable=False)
+    duration = Column(DateTime, nullable=False)
     done = Column(Boolean, default=False)
 
     # Adicionando índice ao campo 'startAt'
