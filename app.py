@@ -92,21 +92,26 @@ def lambda_send_queue():
             reminders = cursor.fetchall()
 
             now = datetime.now()
+            print(f"Current time: {now}")
 
             # Verificar se o lembrete está dentro da janela de 10 minutos
             for reminder in reminders:
                 reminder_id, message, startAt, gap, frequency, userId = reminder
 
-                # Calcula o próximo horário do lembrete, atualizando o next reminder após envio da notificação
+                # Calcula o próximo horário do lembrete
                 next_reminder_time = startAt
                 while next_reminder_time <= now:
                     next_reminder_time += timedelta(hours=gap)
 
-                # Caso esteja na hora de enviar a notificação
-                if now <= next_reminder_time <= now + timedelta(minutes=10):
-                    print(f"now: {now}, next_reminder_time: {next_reminder_time}")
+                # Exemplo: Se o lembrete for para 12h e a diferença for menor que 10 minutos
+                # Verifique se o próximo lembrete está dentro da janela de 10 minutos
+                time_until_reminder = (
+                    next_reminder_time - now
+                ).total_seconds() / 60.0  # em minutos
 
-                    print(f"Está na hora de: {message}")
+                # Envia a notificação se faltar menos de 10 minutos
+                if 0 <= time_until_reminder <= 10:
+                    print(f"Está na hora de: {message}, em {next_reminder_time}")
 
                     # Envia a primeira notificação
                     first_message = {
@@ -144,13 +149,12 @@ def lambda_send_queue():
                         DelaySeconds=900,  # 15 minutos de delay (900 segundos)
                     )
 
-                    # Se deu tudo certo, atualiza o banco de dados
                     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
                         print(
                             f"Notificação 'Já tomou seu remédio?' agendada com sucesso: {second_message}"
                         )
 
-                        # Diminui o valor de frequency para os próximos cálculos quando a função rodar novamente
+                        # Atualiza a frequência no banco de dados
                         if frequency >= 1:
                             update_sql = """
                             UPDATE reminders
@@ -176,7 +180,9 @@ def lambda_send_queue():
                         print(f"Erro ao agendar a segunda notificação: {response}")
                 else:
                     # Caso ainda não esteja na hora
-                    print(f"Ainda não está na hora de: {message}")
+                    print(
+                        f"Ainda não está na hora de: {message}, faltam {time_until_reminder} minutos"
+                    )
 
     except Exception as e:
         print(f"Erro ao verificar lembretes: {str(e)}")
